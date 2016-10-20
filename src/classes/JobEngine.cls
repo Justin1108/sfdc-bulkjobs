@@ -1,6 +1,6 @@
 public with sharing class JobEngine {
 	public static final String Job_Name = 'BulkJob.MaxQueueJob';
-	public static final String Cron_Exp = '0 0 * ? * ? *'; // Schedule every hour
+	public static final String Cron_Exp = '0 0 * * * ? *'; // Schedule every hour
 
 	public class LockException extends Exception { }
 	public class AppException extends Exception { }
@@ -47,8 +47,8 @@ public with sharing class JobEngine {
 	/*
 	 * Start the engine
 	 */
-	public void start() {
-		start(Cron_Exp);
+	public List<Id> start() {
+		return start(Cron_Exp);
 	}
 
 	public List<Id> start(String cronExp) {
@@ -104,6 +104,7 @@ public with sharing class JobEngine {
 	 * Helper method to acquired a lock
 	 */
 	public static Boolean lock(String lockName) {
+		System.debug(LoggingLevel.FINE, 'Try lock ' + lockName + ' record.');
 		try {
 			Lock__c[] locks = [SELECT Id FROM Lock__c WHERE Key__c = :lockName FOR UPDATE];
 			if (locks.size() == 0) {
@@ -114,12 +115,15 @@ public with sharing class JobEngine {
 				locks = [SELECT Id FROM Lock__c WHERE Key__c = :lockName FOR UPDATE];
 			}
 
+			System.debug(LoggingLevel.FINE, 'Lock ' + lockName + ' is acquired successfully.');
 			return true;
 		} catch (QueryException ex) {
 			// {lockName} is locked
+			System.debug(LoggingLevel.ERROR, 'Failed to obtain the ' + lockName + ' lock.');
 			return false;
  		} catch (Exception ex) {
  			// General ex
+			System.debug(LoggingLevel.ERROR, 'Lock ' + lockName + ' error. ' + ex.getMessage());
  			return false;
  		}
 	}

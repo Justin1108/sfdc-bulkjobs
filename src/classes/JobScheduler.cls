@@ -11,7 +11,12 @@ global without sharing class JobScheduler implements Schedulable {
 	}
 
 	global void execute(SchedulableContext sc) {
-		if (JobEngine.lock('JobScheduler')) {
+		System.debug(LoggingLevel.DEBUG, 'Enter JobScheduler.execute');
+		System.debug(LoggingLevel.DEBUG, 'isRepeatJob: ' + String.valueOf(isRepeatJob));
+
+		if (JobEngine.lock('JobQueue')) {
+			System.debug(LoggingLevel.FINE, 'Lock is acquired by ' + sc.getTriggerId());
+
 			Integer totalJobCount = [SELECT Count() FROM AsyncApexJob WHERE JobType='Queueable' AND Status IN ('Queued', 'Preparing', 'Processing')];
 			Integer availJobCount = Max_Queued_Job_Count - totalJobCount;
 			if (availJobCount > 0) {
@@ -46,5 +51,6 @@ global without sharing class JobScheduler implements Schedulable {
 		if (!isRepeatJob) { // Abort the one time job
 			System.abortJob(sc.getTriggerId());
 		}
+		System.debug(LoggingLevel.DEBUG, 'Exit JobScheduler.execute');
 	}
 }
