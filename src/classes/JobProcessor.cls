@@ -12,6 +12,7 @@ public without sharing class JobProcessor implements Queueable {
 	}
 
 	public void execute(QueueableContext ctx) {
+		System.debug(LoggingLevel.DEBUG, 'Enter JobProcessor.execute');
 		Type procType = Type.forName(processorName);
 		IJobProcessor proc;
 		if (procType != null) {
@@ -46,7 +47,8 @@ public without sharing class JobProcessor implements Queueable {
 			// Update the response back the bulk Job
 			Job_Queue__c job = new Job_Queue__c(
 				Id = bulkJobId,
-				Response__c = respStr);
+				Response__c = respStr,
+				Status__c = 'Complete');
 			update job;
 
 			// Chain the Queueable Job if needed
@@ -62,5 +64,8 @@ public without sharing class JobProcessor implements Queueable {
 		} else {
 			System.debug(LoggingLevel.ERROR, processorName + ' class does not exist or implement IJobProcessor interface.');
 		}
+
+		System.debug(LoggingLevel.DEBUG, 'Exit JobProcessor.execute');
+
 	}
 }

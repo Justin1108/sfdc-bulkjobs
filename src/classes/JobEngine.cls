@@ -11,14 +11,23 @@ public with sharing class JobEngine {
 		
 	}
 
-	String getRepeatJobName() {
+	@TestVisible
+	static String getRepeatJobName() {
 		return Job_Name + ' - Hourly';
 	}
 
-	String getOneTimeJobName(Datetime fireTime) {
+	@TestVisible
+	static String getOneTimeJobName(Datetime fireTime) {
 		return Job_Name + ' - ' + fireTime.formatLong();
 	}
 
+	static Id scheduleMaxQueueJob(Datetime nextFireTime) {
+		String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
+		String jobName = getOneTimeJobName(nextFireTime);
+
+		return System.schedule(jobName, sch, new JobScheduler(false));				
+	}
+	
 	public Id addJob(Priority p, String processorName, List<String> recs) {
 		Type pt = Type.forName(processorName);
 		if (pt == null)
@@ -26,7 +35,7 @@ public with sharing class JobEngine {
 
 		Object proc = pt.newInstance();
 
-		if (proc instanceof IJobProcessor && proc instanceof Queueable) {
+		if (proc instanceof IJobProcessor) {
 			Job_Queue__c job = new Job_Queue__c(
 				Priority__c = getPriorityVal(p),
 				Processor__c = processorName,
@@ -72,10 +81,10 @@ public with sharing class JobEngine {
 			if (Datetime.now().addMinutes(5) < nextFireTime) {
 				// Next run is five more minutes later, just schedule a one-time one in 15 seconds
 				nextFireTime = Datetime.now().addSeconds(15);
-				String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
-				jobName = getOneTimeJobName(nextFireTime);
-
-				jobIds.add(System.schedule(jobName, sch, new JobScheduler(false)));
+				//String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
+				//jobName = getOneTimeJobName(nextFireTime);
+				Id jobId = scheduleMaxQueueJob(nextFireTime);
+				jobIds.add(jobId);
 			}
 		} else {
 			throw new LockException();
@@ -115,10 +124,8 @@ public with sharing class JobEngine {
 			if (Datetime.now().addSeconds(90) < nextFireTime) {
 				// Not scheduler will be run in next 90 seconds, schedule in 60 seconds
 				nextFireTime = Datetime.now().addSeconds(60);
-				String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
-				String jobName = getOneTimeJobName(nextFireTime);
 
-				jobId = System.schedule(jobName, sch, new JobScheduler(false));				
+				jobId = scheduleMaxQueueJob(nextFireTime);		
 			}
 		}
 		return jobId;

@@ -59,9 +59,9 @@ private class JobEngineTest {
 
 		// Two should be created, one is one time, the other is repeat
 		System.assertEquals(2, ctList.size());
-		System.assertEquals(JobEngine.Job_Name, ctList[1].CronJobDetail.Name);
+		System.assertEquals(JobEngine.getRepeatJobName(), ctList[1].CronJobDetail.Name);
 		System.assertEquals(nextRunTime, ctList[1].NextFireTime);
-		System.assertEquals(JobEngine.Job_Name + ' - ' + ctList[0].NextFireTime.formatLong(), ctList[0].CronJobDetail.Name);
+		System.assertEquals(JobEngine.getOneTimeJobName(ctList[0].NextFireTime), ctList[0].CronJobDetail.Name);
 
 		engine.stop();
 		ctList = [SELECT CronExpression, TimesTriggered, NextFireTime, CronJobDetail.Name FROM CronTrigger WHERE Id IN :jobIds ORDER BY NextFireTime];
@@ -81,19 +81,80 @@ private class JobEngineTest {
 	}
 
 	@isTest
-	static void test_Scheduler() {
-		Test.startTest();
+	static void test_Dispatch() {
 		JobEngine engine = new JobEngine();
+		System.assertEquals(null, engine.dispatch());
+
+		System.assert(engine.start().size() > 0);
+		engine.stop();
+		System.assertEquals(null, engine.dispatch());
+
+		Test.startTest();
 		List<Id> jobIds = engine.start();
-		System.assert(jobIds.size() >= 1);
+		System.debug('jobIds: ' + jobIds);
+		Test.stopTest();
+		CronTrigger[] ctList = [SELECT CronExpression, TimesTriggered, NextFireTime, CronJobDetail.Name FROM CronTrigger WHERE Id IN :jobIds ORDER BY NextFireTime];
+		System.debug('ctList: ' + JSON.serialize(ctList));
+
+		System.assertEquals(1, ctList.size());
+		
+		String jobId = engine.dispatch();
+		System.debug(jobId);
+		System.assertNotEquals(null, jobId);
+
+
+
+	}
+
+	@isTest
+	static void test_Scheduler1() {
+		JobEngine engine = new JobEngine();
+
+		Test.startTest();
+		List<Id> schIds = engine.start();
+		System.assert(schIds.size() >= 1);
 		Test.stopTest();
 
-		System.debug('jobIds: ' + jobIds);
-		if (jobIds.size() > 1) {
-			CronTrigger[] ctList = [SELECT Id FROM CronTrigger WHERE Id IN :jobIds];
+		System.debug('schIds: ' + schIds);
+		if (schIds.size() > 1) {
+			CronTrigger[] ctList = [SELECT Id FROM CronTrigger WHERE Id IN :schIds];
 			System.assertEquals(1, ctList.size());
 			System.debug('One time job is terminated by itself.');
 		}
+
+	}
+
+	@isTest
+	static void test_Scheduler2() {
+		JobEngine engine = new JobEngine();
+
+		//
+		Test.startTest();
+		engine.addJob(JobEngine.Priority.High, 'JobEngineTest.DummyJobProcessor', new List<String> { '3' });
+		System.assertEquals('Ready', [SELECT Status__c FROM Job_Queue__c LIMIT 1].Status__c);
+		engine.start();
+		Test.stopTest();
+		System.debug('AsyncApexJob: ' + JSON.serialize([SELECT JobType, MethodName, Status FROM AsyncApexJob WHERE JobType='Queueable']));
+		System.assertEquals('Running', [SELECT Status__c FROM Job_Queue__c LIMIT 1].Status__c);
+
+	}
+
+	@isTest
+	static void test_JobProcessor() {
+		JobEngine engine = new JobEngine();
+
+		engine.addJob(JobEngine.Priority.Low, 'JobEngineTest.DummyJobProcessor', new List<String> { '1' });
+		engine.addJob(JobEngine.Priority.Medium, 'JobEngineTest.DummyJobProcessor', new List<String> { '2' });
+		engine.addJob(JobEngine.Priority.High, 'JobEngineTest.DummyJobProcessor', new List<String> { '3' });
+
+		Test.startTest();
+		JobScheduler js = new JobScheduler();
+		js.execute(null);
+		Test.stopTest();
+
+		System.debug('AsyncApexJob: ' + JSON.serialize([SELECT JobType, MethodName, Status FROM AsyncApexJob WHERE JobType='Queueable']));
+		Job_Queue__c[] jobs = [SELECT Priority__c, Processor__c, Request__c, Response__c, Status__c FROM Job_Queue__c];
+		System.debug('jobs: ' + JSON.serialize(jobs));
 	}
 	
 }
