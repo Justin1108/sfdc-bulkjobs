@@ -5,20 +5,18 @@ public with sharing class JobEngine {
 	public class LockException extends Exception { }
 	public class AppException extends Exception { }
 
-	/* 
-	 * Used for test class only
-	 */
-	public class DummyJobProcessor implements IJobProcessor, Queueable {
-		// IJobProcessor
-		public void init(String data) {}
-		// Queueable interface
-		public void execute(QueueableContext context) {}
-	}
-
 	public enum Priority { High, Medium, Low }
 
 	public JobEngine() {
 		
+	}
+
+	String getRepeatJobName() {
+		return Job_Name + ' - Hourly';
+	}
+
+	String getOneTimeJobName(Datetime fireTime) {
+		return Job_Name + ' - ' + fireTime.formatLong();
 	}
 
 	public Id addJob(Priority p, String processorName, List<String> recs) {
@@ -53,16 +51,16 @@ public with sharing class JobEngine {
 
 	public List<Id> start(String cronExp) {
 		List<Id> jobIds = new List<Id>();
+		String jobName = getRepeatJobName();
+
 		if (lock('JobScheduler')) {
 			Datetime nextFireTime;
 			CronTrigger[] ctList = [SELECT Id, CronJobDetail.Id, CronJobDetail.Name, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :Job_Name + '%'];
 			if (ctList.size() == 0) {
 				System.debug(cronExp);
-				jobIds.add(System.schedule(Job_Name, cronExp, new JobScheduler()));
-				CronTrigger ct = [SELECT Id, CronJobDetail.Id, CronJobDetail.Name, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name = :Job_Name];
+				jobIds.add(System.schedule(jobName, cronExp, new JobScheduler()));
+				CronTrigger ct = [SELECT Id, CronJobDetail.Id, CronJobDetail.Name, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name = :jobName];
 				nextFireTime = ct.NextFireTime;
-
-
 			} else {
 				for (CronTrigger ct : ctList) {
 					if (nextFireTime == null || nextFireTime > ct.NextFireTime) {
@@ -75,7 +73,7 @@ public with sharing class JobEngine {
 				// Next run is five more minutes later, just schedule a one-time one in 15 seconds
 				nextFireTime = Datetime.now().addSeconds(15);
 				String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
-				String jobName = Job_Name + ' - ' + nextFireTime.formatLong();
+				jobName = getOneTimeJobName(nextFireTime);
 
 				jobIds.add(System.schedule(jobName, sch, new JobScheduler(false)));
 			}
@@ -98,6 +96,32 @@ public with sharing class JobEngine {
 		} else {
 			throw new LockException();
 		}
+	}
+
+	/*
+	 *
+	 */
+	public Id dispatch() {
+		Id jobId; 
+		if (lock('JobScheduler')) {
+			Datetime nextFireTime;
+			CronTrigger[] ctList = [SELECT Id, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :Job_Name + '%'];
+			for (CronTrigger ct : ctList) {
+				if (nextFireTime == null || nextFireTime > ct.NextFireTime) {
+					nextFireTime = ct.NextFireTime;
+				}
+			}			
+
+			if (Datetime.now().addSeconds(90) < nextFireTime) {
+				// Not scheduler will be run in next 90 seconds, schedule in 60 seconds
+				nextFireTime = Datetime.now().addSeconds(60);
+				String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
+				String jobName = getOneTimeJobName(nextFireTime);
+
+				jobId = System.schedule(jobName, sch, new JobScheduler(false));				
+			}
+		}
+		return jobId;
 	}
 
 	/*

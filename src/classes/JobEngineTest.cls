@@ -1,14 +1,24 @@
 @isTest
 private class JobEngineTest {
+	/* 
+	 * Used for test class only
+	 */
+	public class DummyJobProcessor implements IJobProcessor {
+		public Integer getBatchSize() { return 1; }
+		public Integer[] execute(String[] requestIds) {
+			return new List<Integer> { 1 };
+		}
+	}
+
 	@isTest 
 	static void test_AddJob() {
 		JobEngine engine = new JobEngine();
 
 		// Positive test
-		engine.addJob(JobEngine.Priority.High, 'JobEngine.DummyJobProcessor', new List<String> { '1', '2', '3' });
+		engine.addJob(JobEngine.Priority.High, 'JobEngineTest.DummyJobProcessor', new List<String> { '1', '2', '3' });
 		Job_Queue__c job = [SELECT Priority__c, Processor__c, Request__c, Status__c FROM Job_Queue__c LIMIT 1];
 		System.assertEquals(2, job.Priority__c);
-		System.assertEquals('JobEngine.DummyJobProcessor', job.Processor__c);
+		System.assertEquals('JobEngineTest.DummyJobProcessor', job.Processor__c);
 		System.assertEquals('Ready', job.Status__c);
 		System.assertEquals('1,2,3', job.Request__c);
 
