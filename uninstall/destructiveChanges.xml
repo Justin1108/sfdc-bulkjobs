@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+	<types>
+		<members>IJobProcessor</members>
+		<members>JobEngine</members>
+		<members>JobEngineTest</members>
+		<members>JobProcessor</members>
+		<members>JobScheduler</members>
+		<name>ApexClass</name>
+	</types>
+	<types>
+		<members>Job_Queue__c</members>
+		<members>Lock__c</members>
+		<name>CustomObject</name>
+	</types>
+	<version>38.0</version>
+</Package>
