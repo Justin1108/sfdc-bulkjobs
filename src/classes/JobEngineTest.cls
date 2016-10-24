@@ -4,6 +4,7 @@ private class JobEngineTest {
 	 * Used for test class only
 	 */
 	public class DummyJobProcessor implements IJobProcessor {
+		public void start(String para1, String para2) {}
 		public Integer getBatchSize() { return 1; }
 		public Integer[] execute(String[] requestIds) {
 			return new List<Integer> { 1 };
@@ -68,7 +69,7 @@ private class JobEngineTest {
 		System.assertEquals(0, ctList.size());		
 
 		// Scenario #2
-		nextRunTime = Datetime.now().addMinutes(4); // One hour later 
+		nextRunTime = Datetime.now().addSeconds(4); // 4 seconds later 
 		cronExp = String.format('{0} {1} {2} * * ? *', new List<String> { 
 			String.valueOf(nextRunTime.second()), 
 			String.valueOf(nextRunTime.minute()), 
