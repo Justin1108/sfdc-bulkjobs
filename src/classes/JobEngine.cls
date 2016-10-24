@@ -12,23 +12,43 @@ public with sharing class JobEngine {
 	}
 
 	@TestVisible
+	static String getJobName() {
+		if (Test.isRunningTest())
+			return Job_Name + '_Test';
+		else
+			return Job_Name;
+	}
+
+	@TestVisible
 	static String getRepeatJobName() {
-		return Job_Name + ' - Hourly';
+		return getJobName() + ' - Hourly';
 	}
 
 	@TestVisible
 	static String getOneTimeJobName(Datetime fireTime) {
-		return Job_Name + ' - ' + fireTime.formatLong();
+		return getJobName() + ' - ' + fireTime.formatLong();
 	}
 
-	static Id scheduleMaxQueueJob(Datetime nextFireTime) {
+	public static Integer getMaxBQueueJobs() {
+		return 50;
+	}
+
+	public static Integer getSchedulerTimelag() {
+		return 5;
+	}
+
+	static Id scheduleBQueueJob(Datetime nextFireTime) {
 		String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
 		String jobName = getOneTimeJobName(nextFireTime);
 
 		return System.schedule(jobName, sch, new JobScheduler(false));				
 	}
-	
+
 	public Id addJob(Priority p, String processorName, List<String> recs) {
+		return addJob(p, processorName, null, null, recs);
+	}
+
+	public Id addJob(Priority p, String processorName, String para1, String para2, List<String> recs) {
 		Type pt = Type.forName(processorName);
 		if (pt == null)
 			throw new AppException('The ' + processorName + ' class does not exist.');
@@ -40,6 +60,8 @@ public with sharing class JobEngine {
 				Priority__c = getPriorityVal(p),
 				Processor__c = processorName,
 				Request__c = String.join(recs, ','),
+				Parameter_1__c = para1,
+				Parameter_2__c = para2,
 				Status__c = 'Ready'
 				);
 
@@ -64,7 +86,7 @@ public with sharing class JobEngine {
 
 		if (lock('JobScheduler')) {
 			Datetime nextFireTime;
-			CronTrigger[] ctList = [SELECT Id, CronJobDetail.Id, CronJobDetail.Name, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :Job_Name + '%'];
+			CronTrigger[] ctList = [SELECT Id, CronJobDetail.Id, CronJobDetail.Name, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :getJobName() + '%'];
 			if (ctList.size() == 0) {
 				System.debug(cronExp);
 				jobIds.add(System.schedule(jobName, cronExp, new JobScheduler()));
@@ -78,12 +100,12 @@ public with sharing class JobEngine {
 				}
 			}
 
-			if (Datetime.now().addMinutes(5) < nextFireTime) {
+			if (Datetime.now().addSeconds(getSchedulerTimelag()) < nextFireTime) {
 				// Next run is five more minutes later, just schedule a one-time one in 15 seconds
-				nextFireTime = Datetime.now().addSeconds(15);
+				nextFireTime = Datetime.now().addSeconds(getSchedulerTimelag());
 				//String sch = nextFireTime.second() + ' ' + nextFireTime.minute() + ' ' + nextFireTime.hour() + ' ' + nextFireTime.day() + ' ' + nextFireTime.month() + ' ? ' + nextFireTime.year();
 				//jobName = getOneTimeJobName(nextFireTime);
-				Id jobId = scheduleMaxQueueJob(nextFireTime);
+				Id jobId = scheduleBQueueJob(nextFireTime);
 				jobIds.add(jobId);
 			}
 		} else {
@@ -98,7 +120,7 @@ public with sharing class JobEngine {
 	 */
 	public void stop() {
 		if (lock('JobScheduler')) {
-			CronTrigger[] ctList = [SELECT Id, CronJobDetail.Id, CronJobDetail.Name, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :Job_Name + '%'];
+			CronTrigger[] ctList = [SELECT Id, CronJobDetail.Id, CronJobDetail.Name, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :getJobName() + '%'];
 			for (CronTrigger ct : ctList) {
 				System.abortJob(ct.Id);
 			}
@@ -114,18 +136,18 @@ public with sharing class JobEngine {
 		Id jobId; 
 		if (lock('JobScheduler')) {
 			Datetime nextFireTime;
-			CronTrigger[] ctList = [SELECT Id, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :Job_Name + '%'];
+			CronTrigger[] ctList = [SELECT Id, NextFireTime FROM CronTrigger WHERE CronJobDetail.Name LIKE :getJobName() + '%'];
 			for (CronTrigger ct : ctList) {
 				if (nextFireTime == null || nextFireTime > ct.NextFireTime) {
 					nextFireTime = ct.NextFireTime;
 				}
 			}			
 
-			if (Datetime.now().addSeconds(90) < nextFireTime) {
+			if (Datetime.now().addSeconds(getSchedulerTimelag()) < nextFireTime) {
 				// Not scheduler will be run in next 90 seconds, schedule in 60 seconds
-				nextFireTime = Datetime.now().addSeconds(60);
+				nextFireTime = Datetime.now().addSeconds(getSchedulerTimelag());
 
-				jobId = scheduleMaxQueueJob(nextFireTime);		
+				jobId = scheduleBQueueJob(nextFireTime);		
 			}
 		}
 		return jobId;

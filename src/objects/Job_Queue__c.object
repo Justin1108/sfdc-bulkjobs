@@ -52,6 +52,26 @@
     <enableSharing>true</enableSharing>
     <enableStreamingApi>true</enableStreamingApi>
     <fields>
+        <fullName>Parameter_1__c</fullName>
+        <externalId>false</externalId>
+        <label>Parameter 1</label>
+        <length>64</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Parameter_2__c</fullName>
+        <externalId>false</externalId>
+        <label>Parameter 2</label>
+        <length>255</length>
+        <required>false</required>
+        <trackTrending>false</trackTrending>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
         <fullName>Priority__c</fullName>
         <externalId>false</externalId>
         <inlineHelpText>0-low
@@ -131,13 +151,13 @@
         <trackTrending>false</trackTrending>
         <type>Picklist</type>
     </fields>
-    <label>Job Queue</label>
+    <label>Bulk Queue</label>
     <nameField>
         <displayFormat>J-{00000000}</displayFormat>
         <label>Job Queue Name</label>
         <type>AutoNumber</type>
     </nameField>
-    <pluralLabel>Job Queues</pluralLabel>
+    <pluralLabel>Bulk Queues</pluralLabel>
     <searchLayouts/>
     <sharingModel>ReadWrite</sharingModel>
 </CustomObject>
